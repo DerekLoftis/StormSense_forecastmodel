@@ -10,7 +10,7 @@ StormSense forecast only once it scores best.
 |---|---|---|
 | Observations straight from each gauge (CO-OPS, USGS, VIMS THREDDS, FloodVISION, GreenStream), quality-controlled, ft MLLW | `ssmodel/obs.py` | built |
 | Harmonic tide per gauge (UTide, 27 constituents), `harmonics/<ST>.json` | `ssmodel/tide.py` | built |
-| Surge v1: recent residual handed over to a skill-weighted blend of the member surges | `ssmodel/surge.py` | next |
+| Surge v1: recent residual handed over to a skill-weighted blend of the member surges | `ssmodel/surge.py` | built; hindcast in `hindcast/` |
 | Surge v2: learned correction trained on 2023-2026 backfill | `ssmodel/train.py` | later |
 
 `ssmodel/stations.csv` lists the gauges, their sources and NAVD88 above MLLW. Retired stations

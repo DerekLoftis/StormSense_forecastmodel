@@ -88,11 +88,9 @@ def hourly(t, v):
 
 
 def record(st, info, a, b):
-    """Hourly heights ft MLLW for the fit: CO-OPS's verified hourly heights at NOAA gauges,
-    otherwise the gauge's own quality-controlled record."""
-    if info["source"] == "coops":
-        t, v = obs.coops(info["source_id"], a, b, product="hourly_height")
-        return obs.qc(t, v)
+    """Hourly heights ft MLLW for the fit: the top of each hour of the gauge's own quality-
+    controlled record (at NOAA gauges the 6-minute water levels, which, unlike CO-OPS's
+    verified hourly heights, run up to the present)."""
     return hourly(*obs.fetch(st, a, b, info))
 
 
