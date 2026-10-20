@@ -1,0 +1,39 @@
+station,source,source_id,navd88_above_mllw_ft,lat,lon,nws_lid,alias_of,note,name
+BISH,coops,8571421,1.21,38.22,-76.0383333,BISM2,,,Chesapeake Bay at Bishops Head (IN MLLW)
+CBBT,coops,8638901,1.92,37.03291,-76.08325,CHBV2,,,Chesapeake Bay at Chesapeake Bay Bridge Tunnel (IN MLLW)
+DAHL,coops,8635027,1.04,38.319722222222,-77.036666666667,NCDV2,,,Upper Machodoc Creek near Dahlgren (IN MLLW)
+KIPT,coops,8632200,1.9,37.165,-75.9883333,KPTV2,,,Chesapeake Bay near Kiptopeke (IN MLLW)
+LEWI,coops,8635750,0.83,37.995,-76.465,LWTV2,,,Potomac River at Lewisetta (IN MLLW)
+MNPT,coops,8639348,1.77,36.778333333333,-76.301666666667,MNPV2,,,Elizabeth River near Money Point (IN MLLW)
+SWPT,coops,8638610,1.61,36.946666666667,-76.33,SWPV2,,,James River (VA) at Sewell's Point (IN MLLW)
+USBC,nwis,0204288905,1.827,36.8057,-76.4087,BLYV2,,,Elizabeth River at Bailey Creek near Chesapeake VA (IN MLLW)
+USBK,nwis,0167862550,1.517,37.105,-76.385277777778,BKNV2,,,Brick Kiln Creek near Poquoson (IN MLLW)
+USBM,nwis,0204288539,1.816,,,,,,
+USFM,nwis,0204289994,1.697,37.001944444444,-76.315,FTMV2,,,James River (VA) at Fort Monroe (IN MLLW)
+USHR,nwis,0204289985,1.677,37.032222222222,-76.336666666667,HMNV2,,,Hampton River near Hampton (IN MLLW)
+USJT,nwis,02042770,1.113,37.220139,-76.791453,JSFV2,,,James River (VA) at Jamestown/Scotland Ferry (IN MLLW)
+USLB,nwis,0204293125,1.654,36.841027,-76.057044,LONV2,,,London Bridge Creek at Route 58 in VA Beach
+USLI,nwis,0204292275,1.65,36.906611,-76.095583,LHNV2,,,Lynnhaven River near Lynnhaven Inlet (IN MLLW)
+USLN,nwis,0204295505,1.372,36.859269,-75.984473,LTCV2,,,Little Neck Creek at Pinewood Rd in Virginia Beach (MLLW)
+USLR,nwis,0204297575,2.038,36.8247258,-75.985253,LRBV2,,,Lake Rudee near Bells Rd in Virginia Beach (MLLW)
+USMB,nwis,02042928,1.655,,,,,,
+USNC,nwis,0167892964,1.496,37.045,-76.367777777778,NMCV2,,,New Market Creek near Hampton (IN MLLW)
+USPA,nwis,0204288721,1.797,36.827589,-76.165338,EBRV2,,,Elizabeth River at Route 165 in Virginia Beach
+USPT,nwis,02042893,1.78,36.8436,-76.3647,ELZV2,,,Elizabeth River near Pinehurst in Portsmouth (IN MLLW)
+USSB,nwis,01484812,1.302,,,,,,
+USSF,nwis,02042822,1.798,36.739166666667,-76.582777777778,NMDV2,,,Nansemond River at Suffolk (IN MLLW)
+USTC,nwis,0204291317,1.695,36.843179,-76.124409,THAV2,,,Thalia Creek at Route 58 in Thalia
+WACH,coops,8631044,2.61,37.6083333,-75.685,WAHV2,,,Atlantic Coast at Wachapreague (IN MLLW)
+WADC,coops,8594900,1.4,38.873333333333,-77.021111111111,WASD2,,,Washington Channel at SW Waterfront (IN MLLW)
+WMPT,coops,8636580,1.18,37.615,-76.29,WNDV2,,,Chesapeake Bay at Windmill Point (IN MLLW)
+YRCG,coops,8637689,1.53,37.226666666667,-76.478333333333,YKTV2,,,Chesapeake Bay near Yorktown (IN MLLW)
+GS01,,,1.344,37.38845,-76.93164,,,GreenStream API needs a key; not fetched yet,Chickahominy River at Mamanahunt
+GS02,,,1.651,37.57611,-76.99236,,,GreenStream API needs a key; not fetched yet,Pamunkey River at Lay Landing Rd
+USAR,nwis,01485755,1.166,37.9784722,-75.86375,,,,"Little Annemessex at Crisfield, MD"
+USBB,nwis,0204300267,1.645,36.67980556,-75.984,,,,"Dawley Corners, Beggars Bridge Creek, Virginia Beach"
+USCB,nwis,01484746,1.955,37.902389,-75.407889,,,,"Chincoteague Bay Inlet at Chincoteague, VA"
+USNR,nwis,02042822,1.798,36.739111,-76.58275,,USSF,same USGS site as USSF,"Nansemond River at Rte 460 at Suffolk, VA"
+USSC,nwis,01484938,1.414,37.918828,-75.727539,,,,"Starling Creek at Port of Saxis at Saxis, VA"
+BRDH,thredds,https://tds.vims.edu/thredds/dodsC/daveAll/drf/Tidewatch/BRDH.nc,1.626,37.097565,-76.297431,,,MLLW = 9.71 - value,Back River at Dandy Haven Marina (VIMS gauge)
+USLN-X,archive,floodvision/USLN-X,1.372,36.859269,-75.984473,,,"FloodVISION-AI v2, ml_ft_navd88",Little Neck Creek at Pinewood Rd webcam (FloodVISION-AI ML water level)
+CNRC,archive,greenstream/CNRC,0.691,38.36258,-77.30022,,,GreenStream level_ft_navd88,Accokeek Creek at Crow's Nest Research Center (GreenStream sensor)

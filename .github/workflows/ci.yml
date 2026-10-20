@@ -1,0 +1,28 @@
+# Offline tests, then a live check that every gauge's own observation source answers.
+# The per-station result is posted as annotations on the run.
+name: Tests and observation check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q tests
+      - name: Fetch 2 days from every gauge's own source
+        run: |
+          python -m ssmodel.obs work/obs --days 2 > obs_report.txt || true
+          while IFS=, read -r st src n last err; do
+            if [ "$n" = "0" ]; then echo "::warning title=obs $st ($src)::${err:-no data}"; else echo "::notice title=obs $st ($src)::$n values, last $last"; fi
+          done < obs_report.txt

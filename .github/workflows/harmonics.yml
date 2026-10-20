@@ -1,0 +1,48 @@
+# Fit StormSense's own harmonic tide at every gauge from about a year of hourly heights,
+# check it against NOAA's predictions, and commit harmonics/ to the branch that ran it.
+# Runs monthly (on the default branch), by hand, or when the fitting code changes.
+name: Fit harmonic tides
+
+on:
+  schedule:
+    - cron: "15 3 2 * *"
+  workflow_dispatch:
+  push:
+    paths:
+      - ssmodel/tide.py
+      - ssmodel/stations.csv
+      - .github/workflows/harmonics.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: harmonics-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Fit every gauge
+        run: python -m ssmodel.tide fit
+      - name: Report each fit as an annotation
+        run: |
+          tail -n +2 harmonics/fit_report.csv | while IFS=, read -r st n a b k mean sd rms bias err; do
+            if [ -n "$err" ]; then echo "::warning title=tide $st::$err"; else echo "::notice title=tide $st::$n h $a..$b, $k constituents, mean $mean ft MLLW, residual SD $sd, vs NOAA rms ${rms:-n/a} mean ${bias:-n/a}"; fi
+          done
+      - name: Commit the fits
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add harmonics
+          git diff --cached --quiet && exit 0
+          git commit -m "Refit harmonic tides $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0; sleep $((i * 5)); done
+          exit 1
