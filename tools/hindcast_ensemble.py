@@ -1,4 +1,4 @@
-"""Replay the StormSense v1 blend over archived StormSense Ensemble runs and score it, and every
+"""Replay the StormSense forecast (v1 blend plus the predictor-corrector) over archived StormSense Ensemble runs and score it, and every
 member, against the observations that came in afterwards, with Derek's skill formula.
 
     python tools/hindcast_ensemble.py RUNS_DIR OUT_DIR [--tau 12]
@@ -7,78 +7,26 @@ RUNS_DIR holds ensemble_<cycle>.tar.gz files (or folders of the same name, extra
 StormSense-ensemble releases. Truth is the observed_ft column stitched across the runs, newest
 run winning, as the skill scoring does. The tide is each run's astro_tide_ft (the P-ETSS tide
 lined up with the gauge); the v1 blend barely depends on it. Skill weights for each run come only
-from earlier runs verified before that run's start (no look-ahead).
+and the corrector's offsets come only from earlier runs verified before that run's start (no
+look-ahead). "stormsense" is the corrected forecast, "stormsense_v1" the blend alone.
 
 Writes scores.csv (run x station x forecast x band) and summary.csv (paired comparison of the
 StormSense blend with each member over the same runs, stations and bands).
 """
 import csv
-import io
 import os
-import re
 import sys
-import tarfile
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from ssmodel import surge  # noqa: E402
+from ssmodel import archive, corrector, surge  # noqa: E402
 
 BANDS = surge.BANDS + [("0-72", 0, 72)]
 SKIP = {"DAHL", "WADC", "USSC", "USAR", "USCB", "USNR", "USSB", "GS01", "USBB"}  # aliased obs in Tidewatch's record
 WINDOW = timedelta(days=5)
-
-
-def parse_t(s):
-    return datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-
-
-def read_runs(folder):
-    """{cycle: {station: (grid, cols)}} from the MLLW ens72 CSVs of each archived run."""
-    runs = {}
-    for name in sorted(os.listdir(folder)):
-        m = re.match(r"ensemble_(\d{4}-\d\d-\d\dT\d\dZ)(\.tar\.gz)?$", name)
-        if not m:
-            continue
-        files = {}
-        path = os.path.join(folder, name)
-        if name.endswith(".tar.gz"):
-            with tarfile.open(path) as t:
-                for mem in t.getmembers():
-                    if mem.name.endswith("_ens72_MLLW.csv"):
-                        files[os.path.basename(mem.name)] = t.extractfile(mem).read().decode()
-        else:
-            d = os.path.join(path, "ens72")
-            for n in os.listdir(d):
-                if n.endswith("_ens72_MLLW.csv"):
-                    files[n] = open(os.path.join(d, n)).read()
-        by_st = {}
-        for n, text in files.items():
-            rows = list(csv.reader(io.StringIO(text)))
-            head, rows = rows[0], rows[1:]
-            grid = np.array([parse_t(r[0]) for r in rows])
-            cols = {}
-            for j, h in enumerate(head[1:], 1):
-                v = np.array([float(r[j]) if r[j] else np.nan for r in rows])
-                if not np.isnan(v).all():
-                    cols[h[:-3]] = v
-            by_st[n.split("_ens72_")[0]] = (grid, cols)
-        runs[m.group(1)] = by_st
-    return runs
-
-
-def truth_series(runs):
-    """{station: {time: observed ft}}, the newest run's value winning."""
-    out = defaultdict(dict)
-    for cyc in sorted(runs):
-        for st, (grid, cols) in runs[cyc].items():
-            if "observed" in cols:
-                for t, v in zip(grid, cols["observed"]):
-                    if not np.isnan(v):
-                        out[st][t] = v
-    return out
 
 
 def stats(f, o):
@@ -95,12 +43,19 @@ def stats(f, o):
     return {"N": len(o), "R2": r2, "Bias": bias, "MAE": mae, "RMSE": rmse, "SDobs": sd, "Skill": float(skill)}
 
 
+def predict(grid, t0, cols):
+    """The uncorrected blend, as the corrector re-runs it on each earlier run."""
+    if "astro_tide" not in cols:
+        return None
+    return surge.forecast(grid, t0, cols, cols["astro_tide"])[0]["stormsense"], cols["astro_tide"]
+
+
 def main(argv):
     runs_dir, out = argv[0], argv[1]
     tau = float(argv[argv.index("--tau") + 1]) if "--tau" in argv else surge.TAU_H
     os.makedirs(out, exist_ok=True)
-    runs = read_runs(runs_dir)
-    truth = truth_series(runs)
+    runs = archive.read_folder(runs_dir)
+    truth = archive.truth_series(runs)
     last_obs = max(max(d) for d in truth.values())
     scores = []      # rows for scores.csv
     paired = []      # (forecast, band, station, its stats, StormSense's stats on the same hours)
@@ -121,9 +76,13 @@ def main(argv):
                     recent[m][b].append(r)
             skill = {m: {b: float(np.sqrt(np.mean(np.square(v)))) for b, v in bb.items()} for m, bb in recent.items()}
             fc = {}
-            fc["stormsense"], _ = surge.forecast(grid, t0, cols, tide, skill or None, tau)
-            fc["stormsense_eq"], _ = surge.forecast(grid, t0, cols, tide, None, tau)
-            fc["stormsense"], fc["stormsense_eq"] = fc["stormsense"]["stormsense"], fc["stormsense_eq"]["stormsense"]
+            v1, _ = surge.forecast(grid, t0, cols, tide, skill or None, tau)
+            fc["stormsense_v1"] = v1["stormsense"]
+            fc["stormsense_eq"] = surge.forecast(grid, t0, cols, tide, None, tau)[0]["stormsense"]
+            # predictor-corrector: the blend's own errors in earlier runs, verified by t0
+            past = {c: r for c, r in runs.items() if c < cyc}
+            corr, _ = corrector.correction_for(st, past, truth, t0, predict)
+            fc["stormsense"] = corrector.apply(grid, t0, {"stormsense": v1["stormsense"].copy()}, tide, corr)["stormsense"]
             for k in surge.MEMBERS + ["baseline"]:
                 if k in cols:
                     fc[k] = cols[k]
@@ -155,7 +114,7 @@ def main(argv):
             w.writerow({k: (round(v, 4) if isinstance(v, float) else v) for k, v in r.items()})
     # paired comparison: StormSense vs each forecast on the same cycle, station and band
     rows = []
-    for k in ["stormsense_eq"] + surge.MEMBERS + ["baseline"]:
+    for k in ["stormsense_v1", "stormsense_eq"] + surge.MEMBERS + ["baseline"]:
         for band, _, _ in BANDS:
             pairs = [(p, s) for f, b, st, s, p in paired if f == k and b == band]
             if not pairs:

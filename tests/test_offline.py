@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from ssmodel import obs, surge, tide  # noqa: E402
+from ssmodel import corrector, obs, surge, tide  # noqa: E402
 
 T0 = datetime(2026, 9, 1, tzinfo=timezone.utc)
 
@@ -109,6 +109,56 @@ def test_surge_without_members_is_persistence():
     out, _ = surge.forecast(grid, t0, {"observed": np.where(lead <= 0, 0.5, np.nan)}, tide_)
     k = np.argmin(np.abs(lead - 24))
     assert abs(out["stormsense"][k] - 0.5 / np.e) < 0.01
+
+
+def _past_runs(scale, noise, n=12, seed=1):
+    """Synthetic earlier runs at one gauge: the predicted surge is `scale` times what happened."""
+    rng = np.random.default_rng(seed)
+    runs, truth = {}, {}
+    start = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    for i in range(n):
+        t0 = start + timedelta(hours=6 * i)
+        grid = np.array([t0 - timedelta(hours=24) + timedelta(minutes=6 * k) for k in range(961)])
+        lead = surge.lead_hours(grid, t0)
+        hrs = np.array([(t - start).total_seconds() / 3600 for t in grid])
+        tide_ = np.cos(2 * np.pi * hrs / 12.42)
+        real = 0.8 * np.sin(2 * np.pi * hrs / 96.0)  # a slow surge, different in each run's window
+        for t, v in zip(grid, tide_ + real + noise * rng.standard_normal(len(grid))):
+            truth[t] = v
+        pred = np.where(lead > 0, tide_ + scale * real, np.nan)
+        runs[f"r{i:02d}"] = {"TEST": (grid, {"observed": np.where(lead <= 0, tide_ + real, np.nan), "pred": pred, "tide": tide_})}
+    now = start + timedelta(hours=6 * n + 72)
+    return runs, {"TEST": truth}, now
+
+
+def _predict(grid, t0, cols):
+    return cols["pred"], cols["tide"]
+
+
+def test_corrector_learns_a_surge_scaling():
+    runs, truth, now = _past_runs(scale=1.5, noise=0.02)
+    coefs, info = corrector.correction_for("TEST", runs, truth, now, _predict)
+    assert info["applied"]
+    for band in ("12-36", "36-72"):
+        a, b = coefs[band]
+        assert abs(info["bands"][band]["fit_b"] + 1 / 3) < 0.02  # truth = pred / 1.5: b = -1/3 ...
+        assert -0.3 < b < -0.15 and abs(a) < 0.05                # ... applied shrunk by n / (n + K)
+
+
+def test_corrector_leaves_noise_alone():
+    runs, truth, now = _past_runs(scale=1.0, noise=0.3)
+    coefs, info = corrector.correction_for("TEST", runs, truth, now, _predict)
+    assert all(abs(a) < 0.03 and abs(b) < 0.05 for a, b in coefs.values())
+
+
+def test_corrector_needs_enough_runs_and_starts_at_the_gauge():
+    runs, truth, now = _past_runs(scale=1.5, noise=0.02, n=3)
+    coefs, info = corrector.correction_for("TEST", runs, truth, now, _predict)
+    assert not info["applied"]
+    t0 = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    grid = np.array([t0 + timedelta(minutes=6 * k) for k in range(721)])
+    c = corrector.correction(grid, t0, np.full(len(grid), 2.0), {"0-12": (0.25, 0.5), "12-36": (0.25, 0.5), "36-72": (0.25, 0.5)})
+    assert c[0] == 0 and abs(c[-1] - corrector.CAP_FT) < 1e-9
 
 
 if __name__ == "__main__":
