@@ -10,13 +10,15 @@ Aliased gauges (DAHL, WADC, USSC, USAR, USCB, USNR, USSB, GS01, USBB) are left o
 `v1pc_2026-10-16_to_21_*`: the v1 blend plus the predictor-corrector (`ssmodel/corrector.py`)
 over the 20 runs archived 16-21 Oct. Here `stormsense` is the corrected forecast and
 `stormsense_v1` the blend alone; the corrector for each run is fitted only from earlier runs
-verified by its start. Against the blend alone, on the same hours (mean RMSE, ft):
+verified by its start (K = 8 runs, correction capped at 0.3 ft). The mean improves while most
+individual forecasts change little: the corrector mainly trims the forecasts that overshot
+after the 19-20 Oct high water. Against the blend alone, on the same hours (mean RMSE, ft):
 
 | band | blend | corrected |
 |---|---|---|
 | 0-12 h | 0.195 | 0.197 |
-| 12-36 h | 0.313 | 0.304 |
-| 36-72 h | 0.772 | 0.750 |
+| 12-36 h | 0.313 | 0.300 |
+| 36-72 h | 0.772 | 0.756 |
 
 `offset_only_2026-10-16_to_21_summary.csv`: the same corrector restricted to a constant offset
 per lead band (no surge scaling). It over-corrects after the 19-20 Oct high water (12-36 h

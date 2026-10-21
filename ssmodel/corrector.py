@@ -18,7 +18,7 @@ Guards against over- and under-correcting:
 - Each coefficient is shrunk by James-Stein (to nothing when it is no bigger than its own
   standard error) and by n / (n + K) with K = 8 runs. Errors of one storm are correlated, so
   the standard errors count runs, not six-minute points.
-- |a| <= 0.25 ft, -0.5 <= b <= 0.5, total correction <= 0.5 ft; nothing before 4 verified runs.
+- |a| <= 0.25 ft, |b| <= 0.3, total correction <= 0.3 ft; nothing before 4 verified runs.
 - Faded in over the first hours (1 - exp(-h / 3 h)): the forecast still starts at the gauge.
 - Recency weighting lets the correction follow seasonal mean-level changes and forget a
   storm within days.
@@ -29,7 +29,7 @@ EFOLD_DAYS = 3.0
 WINDOW_DAYS = 7.0
 MIN_RUNS = 4
 K_RUNS = 8.0
-CAP_A, CAP_B, CAP_FT = 0.25, 0.5, 0.5
+CAP_A, CAP_B, CAP_FT = 0.25, 0.3, 0.3
 TAPER_H = 3.0
 EASE_H = 3.0
 BANDS = [("0-12", 0, 12), ("12-36", 12, 36), ("36-72", 36, 72)]
