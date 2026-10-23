@@ -32,6 +32,19 @@ def test_qc_drops_spikes_range_and_stuck_runs():
     assert len(tq) > len(t) - 25
 
 
+def test_qc_flags_keep_every_reading_and_say_why():
+    t, v = series(24)
+    v = v.copy()
+    v[50] += 3.0
+    v[60] = 99.0
+    v[100:115] = v[100]
+    tf, vf, f = obs.qc_flags(t[::-1], v[::-1])  # sorted on the way
+    assert len(tf) == len(t) and tf[0] == t[0]
+    assert f[60] == 1 and f[50] == 2 and (f[100:115] == 3).all()
+    tq, _ = obs.qc(t, v)
+    assert list(tq) == list(tf[f == 0])
+
+
 def test_flatline_keeps_short_holds():
     t, v = series(6)
     v = v.copy()
