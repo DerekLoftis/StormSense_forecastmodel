@@ -201,42 +201,65 @@ def archive(source_id, a, b):
 
 
 # --- quality control ---------------------------------------------------------------
-def despike(t, v, window=15, tol=0.5):
-    """Drop values more than tol ft off the running median of `window` points."""
+QC_FLAGS = {0: "ok", 1: "range", 2: "spike", 3: "flatline"}
+
+
+def _spike_ok(v, window=15, tol=0.5):
     if len(v) <= window:
-        return t, v
+        return np.ones(len(v), bool)
     import pandas as pd
     med = pd.Series(v).rolling(window, center=True, min_periods=max(3, window // 3)).median().to_numpy()
-    keep = np.abs(v - med) <= tol
-    return t[keep], v[keep]
+    return np.abs(v - med) <= tol
 
 
-def flatline(t, v, max_same=timedelta(minutes=48)):
-    """Drop runs where the value doesn't change for longer than max_same: a tidal gauge always
-    moves, so a held value is a stuck or repeated reading (USBB repeats values in ~18-minute steps)."""
-    if len(v) < 3:
-        return t, v
+def _flat_ok(t, v, max_same=timedelta(minutes=48)):
     keep = np.ones(len(v), bool)
+    if len(v) < 3:
+        return keep
     start = 0
     for i in range(1, len(v) + 1):
         if i == len(v) or v[i] != v[start]:
             if t[i - 1] - t[start] > max_same:
                 keep[start:i] = False
             start = i
+    return keep
+
+
+def despike(t, v, window=15, tol=0.5):
+    """Drop values more than tol ft off the running median of `window` points."""
+    keep = _spike_ok(v, window, tol)
     return t[keep], v[keep]
+
+
+def flatline(t, v, max_same=timedelta(minutes=48)):
+    """Drop runs where the value doesn't change for longer than max_same: a tidal gauge always
+    moves, so a held value is a stuck or repeated reading (USBB repeats values in ~18-minute steps)."""
+    keep = _flat_ok(t, v, max_same)
+    return t[keep], v[keep]
+
+
+def qc_flags(t, v, lo=-4.0, hi=14.0):
+    """(times, values, flags) sorted and de-duplicated, every reading kept and flagged with a
+    QC_FLAGS code: out of a plausible range (ft MLLW), spike, or part of a stuck run."""
+    if not len(t):
+        return t, v, np.zeros(0, int)
+    s = np.array([x.timestamp() for x in t])
+    o = np.argsort(s, kind="stable")
+    _, first = np.unique(s[o], return_index=True)
+    t, v = t[o][first], np.asarray(v, float)[o][first]
+    flags = np.zeros(len(t), int)
+    flags[~(np.isfinite(v) & (v > lo) & (v < hi))] = 1
+    idx = np.where(flags == 0)[0]
+    flags[idx[~_spike_ok(v[idx])]] = 2
+    idx = np.where(flags == 0)[0]
+    flags[idx[~_flat_ok(t[idx], v[idx])]] = 3
+    return t, v, flags
 
 
 def qc(t, v, lo=-4.0, hi=14.0):
     """Sorted, de-duplicated, in a plausible range (ft MLLW), despiked, no stuck runs."""
-    if not len(t):
-        return t, v
-    o = np.argsort(np.array([x.timestamp() for x in t]), kind="stable")
-    t, v = t[o], v[o]
-    _, first = np.unique(np.array([x.timestamp() for x in t]), return_index=True)
-    t, v = t[first], v[first]
-    ok = np.isfinite(v) & (v > lo) & (v < hi)
-    t, v = flatline(*despike(t[ok], v[ok]))
-    return t, v
+    t, v, flags = qc_flags(t, v, lo, hi)
+    return t[flags == 0], v[flags == 0]
 
 
 def on_six_minutes(t, v, max_gap=timedelta(minutes=30)):
@@ -258,9 +281,9 @@ def on_six_minutes(t, v, max_gap=timedelta(minutes=30)):
 
 
 # --- one station -------------------------------------------------------------------
-def fetch(st, a, b, info=None):
-    """(times, ft MLLW) for station st between a and b, quality-controlled, on the 6-minute clock.
-    Raises if the station has no source of its own."""
+def fetch_raw(st, a, b, info=None):
+    """(times, ft MLLW) for station st between a and b as its source reports them (its own time
+    step, no QC). Raises if the station has no source of its own."""
     info = info or stations()[st]
     src, sid = info["source"], info["source_id"]
     if info["alias_of"]:
@@ -277,7 +300,13 @@ def fetch(st, a, b, info=None):
         v = v + info["navd88"]
     else:
         raise ValueError(f"{st}: no observation source ({info['note'] or 'none listed'})")
-    return on_six_minutes(*qc(t, v))
+    return t, v
+
+
+def fetch(st, a, b, info=None):
+    """(times, ft MLLW) for station st between a and b, quality-controlled, on the 6-minute clock.
+    Raises if the station has no source of its own."""
+    return on_six_minutes(*qc(*fetch_raw(st, a, b, info)))
 
 
 def write_csv(path, t, v):
